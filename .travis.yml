@@ -7,23 +7,30 @@ addons:
     sources:
       - hvr-ghc
     packages:
-      - ghc-7.10.3
-      - cabal-install-1.22
+      #- ghc-7.10.3
+      #- cabal-install-1.22
 
 before_install:
   - export PATH=$HOME/.tinc/bin:/opt/ghc/7.10.3/bin:/opt/cabal/1.22/bin:$PATH
-  - curl -sSL https://github.com/sol/tinc/raw/master/get-tinc.sh | bash
-  - tinc --version
-  - ghc --version
-  - cabal --version
-  - travis_retry cabal update
-  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
-
+  #- curl -sSL https://github.com/sol/tinc/raw/master/get-tinc.sh | bash
+  #- tinc --version
+  #- ghc --version
+  #- cabal --version
+  #- travis_retry cabal update
+  #- sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
+  - export NIX_BUILD_CORES=2
+  - (test -f $HOME/rootfs.cache/rootfs.tar.bz2 && tar --checkpoint=50000 -C / -xf $HOME/rootfs.cache/rootfs.tar.bz2) || true
+  - curl -OL http://static.proot.me/proot-x86_64 && mv proot-x86_64 proot && chmod +x proot
+  - mkdir -p $HOME/rootfs/nix $HOME/rootfs/etc/nix
+  
 install:
-  - tinc
+  #- tinc
+  - ./proot -R / -b $HOME/rootfs/nix:/nix -b $HOME/rootfs/etc/nix:/etc/nix -0 acceptance/setup_nix.sh
 
 script:
-  - cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test
+  - travis_wait 50 ./proot -R / -b $HOME/rootfs/nix:/nix -b $HOME/rootfs/etc/nix:/etc/nix -0 acceptance/run_tests.sh
+  #- cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test
+  #- bats/bin/bats acceptance/test.sh
 
 before_deploy:
   - mkdir -p build
@@ -41,3 +48,8 @@ deploy:
 cache:
   directories:
     - $HOME/.tinc/cache
+    - $HOME/rootfs.cache
+
+before_cache:
+  - mkdir -p $HOME/rootfs.cache
+  - tar --checkpoint=30000 -jcf $HOME/rootfs.cache/rootfs.tar.bz2 $HOME/rootfs $HOME/.profile $HOME/.nix-profile
