@@ -28,6 +28,7 @@ install:
   - ./proot -R / -b $HOME/rootfs/nix:/nix -b $HOME/rootfs/etc/nix:/etc/nix -0 acceptance/setup_nix.sh
 
 script:
+  - export TINC_USE_NIX=yes
   - travis_wait 50 ./proot -R / -b $HOME/rootfs/nix:/nix -b $HOME/rootfs/etc/nix:/etc/nix -0 acceptance/run_tests.sh
   #- cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test
   #- bats/bin/bats acceptance/test.sh

@@ -18,6 +18,7 @@ fi
 nix-channel --update
 
 install_update() {
+  echo "Installing/updating $1"
   (nix-env -q "$1" || nix-env -Qi "$1") && nix-env -Qu "$1"
 }
 
@@ -26,9 +27,11 @@ for i in $PKGS; do
   install_update "$i"
 done
 
+echo "Building toolchain for tinc"
 nix-build -Q -o result-toolchain toolchain.nix
+
+echo "Installing tinc"
 nix-env -i tinc -f default.nix
 mkdir -p ~/.tinc
 ln -sf $PWD/plugins ~/.tinc/
 
-ls -l /nix/var/nix/gcroots/auto
