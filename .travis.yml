@@ -1,56 +1,52 @@
-sudo: false
-
+#sudo: false
+sudo: required
+dist: trusty
 language: c
 
-addons:
-  apt:
-    sources:
-      - hvr-ghc
-    packages:
-      #- ghc-7.10.3
-      #- cabal-install-1.22
-
 before_install:
-  - export PATH=$HOME/.tinc/bin:/opt/ghc/7.10.3/bin:/opt/cabal/1.22/bin:$PATH
-  #- curl -sSL https://github.com/sol/tinc/raw/master/get-tinc.sh | bash
-  #- tinc --version
-  #- ghc --version
-  #- cabal --version
-  #- travis_retry cabal update
-  #- sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
-  - export NIX_BUILD_CORES=2
-  - (test -f $HOME/rootfs.cache/rootfs.tar.bz2 && tar --checkpoint=50000 -C / -xf $HOME/rootfs.cache/rootfs.tar.bz2) || true
-  - curl -OL http://static.proot.me/proot-x86_64 && mv proot-x86_64 proot && chmod +x proot
-  - mkdir -p $HOME/rootfs/nix $HOME/rootfs/etc/nix
-  
+  - sudo mkdir -p /etc/nix
+  - sudo sh -c 'echo "build-max-jobs = 4" >> /etc/nix/nix.conf'
+  - sudo sh -c 'echo "build-users-group =" >> /etc/nix/nix.conf'
+  - bash <(curl -sSL https://nixos.org/nix/install)
+  - source $HOME/.nix-profile/etc/profile.d/nix.sh
+
+  #- bash <(curl -sSL https://github.com/robbinch/travis-nix-proot/raw/master/install)
+  # - export PATH=$HOME/.travis-nix-proot/bin:$PATH
+  - export TINC_USE_NIX=yes
+  # - travis-nix-proot setup
+
 install:
-  #- tinc
-  - ./proot -R / -b $HOME/rootfs/nix:/nix -b $HOME/rootfs/etc/nix:/etc/nix -0 acceptance/setup_nix.sh
+  - nix-env -i bats
+  - nix-env -i bc
+  - nix-env -i cabal-install
+
+  # - travis-nix-proot nix-env -i bats
+  # - travis-nix-proot nix-env -i bc
+  # - travis-nix-proot nix-env -i cabal-install
+
+before_script:
+  - cabal sdist
+  - nix-env -iA haskellPackages.tinc -f '<nixpkgs>'
+  - mkdir -p $HOME/.tinc
+  - ln -s $PWD/plugins $HOME/.tinc/
+  - cabal update
+  - tinc install
+
+  # - travis-nix-proot cabal sdist
+  # - travis-nix-proot nix-env -i tinc -f default.nix
+  # - ln -s $PWD/plugins $HOME/.tinc/
 
 script:
-  - export TINC_USE_NIX=yes
-  - travis_wait 50 ./proot -R / -b $HOME/rootfs/nix:/nix -b $HOME/rootfs/etc/nix:/etc/nix -0 acceptance/run_tests.sh
-  #- cabal configure --enable-tests --ghc-options=-Werror && cabal build && cabal test
-  #- bats/bin/bats acceptance/test.sh
+  - travis_wait 50 bats acceptance/run_tests.sh
 
-before_deploy:
-  - mkdir -p build
-  - cp dist/build/tinc/tinc build
+  # - travis_wait 50 travis-nix-proot bats acceptance/run_tests.sh
 
-deploy:
-  provider: s3
-  access_key_id: AKIAIBUWFUF2B6KL7ZGQ
-  secret_access_key:
-    secure: "RSvT0PL1qw+/sxzlH9ezWgnF0VV4RR3pfgQljf9FUELrDpQEcrAXaTMGQKbUdxIfOJKrryP2C6LDHiQQLH7yd9JUdWd5e6U4ebHl5j9SuGMOUScptRk1jovp8MbXic33QpMDKqodheK7tVeZXmuUryLg5Hb3CCjv6Lu2BUJIZZ5cC0KTTL0pbHdOm+NlEfHXKOQ0Vjgyv6/1/MnYdsYOz0w/W/ynKvMKwG673knQE6DD8ACr7Np3tB7z/L+iQ9SrzQ1VLSll1IAo3lR3QY2x2MDebbaFgoGV3i3OLZQK89BoZHhfFU0AQqG6m65rfpmcERcfNsQm13camEQxD73M56TgUCHxj4uyNvaVAf4T0QxLf41eHJFExXekwm1+crW1ffFSmyaTMpS3EMJMa8XTF80X9rkzOxFlh8Vyj4VF/Ig7qdqXXfU619Lns67vxXI5QpM6MY5BQiY0Ku3JK6XDQKBbYinUSOIHAqh8xKMgQVq5V1qdQFMcI0fZpWWgubmBeM+Yu5wnUh4N346jlvsIq/pq37lSENcBKyS/G+wv/3hk8eaelFqi6GA6u6bOoiDfKCBV2lwnz93Z0wMOkKGRTxb5APosU6NHQJkeUxmxkgTpWFjFZ8XIHoZCj9NJy3YyqQgDy1rsRrpmrvRHk8ceBQUn8LsQX0iGBTM0LDAbzXE="
-  bucket: zalora-public
-  local_dir: build
-  skip_cleanup: true
+# before_cache:
+#   - travis-nix-proot gc
+#   - travis-nix-proot dump-db
 
-cache:
-  directories:
-    - $HOME/.tinc/cache
-    - $HOME/rootfs.cache
-
-before_cache:
-  - mkdir -p $HOME/rootfs.cache
-  - tar --checkpoint=30000 -jcf $HOME/rootfs.cache/rootfs.tar.bz2 $HOME/rootfs $HOME/.profile $HOME/.nix-profile
+# cache:
+#   directories:
+#     - $HOME/.tinc/cache
+#     - /nix
+#     - $HOME/travis-nix-proot.cache

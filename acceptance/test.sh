@@ -12,6 +12,7 @@
 }
 
 @test "tinc can bootstrap itself" {
-  tinc install >&2
+  echo "true" | tinc shell >&2
+  nix-build -o result-bootstrap >&2
   [ "$?" -eq 0 ]
 }

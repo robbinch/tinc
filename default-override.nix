@@ -18,4 +18,8 @@
         --prefix PATH : '${cabal2nix}/bin' \
         --prefix PATH : '${cabal-install}/bin'
     '';
+    src =
+      let
+        tarball = builtins.toPath (builtins.getEnv "PWD" + "./dist/tinc-" + oldAttrs.version + ".tar.gz");
+      in if builtins.pathExists tarball then tarball else ./.;
   })
